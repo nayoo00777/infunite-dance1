@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>원주율이 무리수인 이유</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #050505;
+            color: #e5e7eb;
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            overflow-x: hidden;
+        }
+        canvas {
+            border-radius: 12px;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+            cursor: crosshair;
+        }
+        .math-font {
+            font-family: 'Times New Roman', serif;
+            font-style: italic;
+        }
+        .glow {
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.6);
+        }
+        input[type="range"] {
+            accent-color: #60a5fa;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 flex flex-col items-center min-h-screen text-slate-200">
+    <div class="max-w-4xl w-full flex flex-col gap-6">
+        <!-- Header -->
+        <header class="text-center space-y-2">
+            <h1 class="text-3xl md:text-4xl font-bold glow">원주율이 무리수인 이유</h1>
+            <p class="text-slate-400 font-medium">$z(\theta) = e^{\theta i} + e^{\omega \theta i}$ 궤적 시뮬레이션</p>
+        </header>
+
+        <!-- Main Display -->
+        <div class="relative bg-zinc-900/50 p-4 rounded-3xl border border-white/5 backdrop-blur-sm">
+            <canvas id="vizCanvas" class="w-full h-auto aspect-square bg-black"></canvas>
+            
+            <div class="absolute top-8 left-8 bg-black/70 backdrop-blur-lg p-4 rounded-2xl border border-white/10 text-xs md:text-sm shadow-2xl">
+                <div class="flex items-center gap-3">
+                    <span class="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6]"></span>
+                    <span class="font-semibold text-blue-100">벡터 1 (중심 회전)</span>
+                </div>
+                <div class="flex items-center gap-3 mt-2">
+                    <span class="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
+                    <span class="font-semibold text-cyan-100">벡터 2 (상대 회전)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Left Panel: Parameter Controls -->
+            <div class="bg-zinc-900/80 p-6 rounded-2xl border border-white/5 space-y-6">
+                <!-- Omega Ratio Slider -->
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <label class="font-bold text-slate-300">회전 비율 ($\omega$)</label>
+                        <span id="omegaValue" class="text-blue-400 font-mono font-bold text-lg">3.14159...</span>
+                    </div>
+                    <input type="range" id="omegaSlider" min="1" max="5" step="0.0001" value="3.1415926535" class="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+                    
+                    <div class="flex flex-wrap gap-2 pt-1">
+                        <button onclick="setOmega(Math.PI, true)" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs transition-all font-bold shadow-lg shadow-blue-900/20">실제 $\pi$ 설정</button>
+                        <button onclick="setOmega(3.14, false)" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-xs transition-all border border-white/5">3.14 (유리수)</button>
+                        <button onclick="setOmega(2, false)" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-xs transition-all border border-white/5">2.0 (정수)</button>
+                    </div>
+                </div>
+
+                <!-- Speed Slider -->
+                <div class="space-y-3 pt-2 border-t border-white/5">
+                    <div class="flex justify-between items-center">
+                        <label class="font-bold text-slate-300">그리기 속도</label>
+                        <span id="speedValue" class="text-cyan-400 font-mono font-bold">x15</span>
+                    </div>
+                    <input type="range" id="speedSlider" min="1" max="150" step="1" value="15" class="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+                </div>
+            </div>
+
+            <!-- Right Panel: Status & Playback -->
+            <div class="bg-zinc-900/80 p-6 rounded-2xl border border-white/5 flex flex-col justify-between">
+                <div>
+                    <h3 class="font-bold text-lg mb-2 text-slate-100">상태 분석</h3>
+                    <div id="statusBox" class="p-4 rounded-xl bg-black/40 border border-white/5 min-h-[110px] flex items-center">
+                        <p id="statusText" class="text-slate-300 leading-relaxed italic text-sm md:text-base">초기화 중...</p>
+                    </div>
+                </div>
+                
+                <div class="mt-5 flex gap-4">
+                    <button id="playPauseBtn" class="flex-[2] py-3.5 bg-white text-black font-extrabold rounded-2xl hover:bg-slate-200 transition-all flex items-center justify-center gap-2 shadow-xl">
+                        <span id="playIcon" class="text-lg">⏸</span> <span id="playText">일시정지</span>
+                    </button>
+                    <button id="resetBtn" class="flex-1 py-3.5 border border-white/10 rounded-2xl hover:bg-white/5 transition-all font-bold">초기화</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Explanation Section -->
+        <section class="bg-zinc-900/50 p-8 rounded-3xl border border-white/5 space-y-6 mb-12">
+            <h2 class="text-2xl font-bold border-b border-white/10 pb-4 text-white flex items-center gap-2">
+                <span class="text-blue-500">■</span> 수학적 원리
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-slate-400 leading-relaxed">
+                <div class="space-y-4">
+                    <p>
+                        이 그래프는 두 개의 회전 벡터를 합산한 결과입니다. 
+                        수식으로는 복소평면상의 경로로 표현됩니다:
+                    </p>
+                    <div class="bg-black/60 p-5 rounded-2xl text-center font-serif text-xl text-white border border-white/5 shadow-inner">
+                        $z(\theta) = e^{i\theta} + e^{i\omega\theta}$
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    <p>
+                        비율 $\omega$가 <strong class="text-blue-400 italic">무리수($\pi$)</strong>인 경우, 두 회전은 영원히 같은 위상으로 돌아오지 않습니다. 
+                    </p>
+                    <p>
+                        궤적은 끊임없이 새로운 지점을 통과하며 면적을 채워나가는데, 이는 무리수가 소수점 아래에서 규칙 없이 <strong>영원히 반복되지 않는 특성</strong>을 시각적으로 보여주는 것입니다.
+                    </p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('vizCanvas');
+        const ctx = canvas.getContext('2d');
+        const omegaSlider = document.getElementById('omegaSlider');
+        const omegaValueDisplay = document.getElementById('omegaValue');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValueDisplay = document.getElementById('speedValue');
+        const statusText = document.getElementById('statusText');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const playIcon = document.getElementById('playIcon');
+        const playText = document.getElementById('playText');
+        const resetBtn = document.getElementById('resetBtn');
+
+        let width, height, centerX, centerY, scale;
+        let theta = 0;
+        let omega = Math.PI;
+        let drawSpeed = 15;
+        let points = [];
+        let isRunning = true;
+        let isPi = true;
+
+        function init() {
+            width = canvas.parentElement.clientWidth;
+            height = width;
+            canvas.width = width * window.devicePixelRatio;
+            canvas.height = height * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            centerX = width / 2;
+            centerY = height / 2;
+            scale = width / 4.5;
+            reset();
+        }
+
+        function reset() {
+            points = [];
+            theta = 0;
+            ctx.clearRect(0, 0, width, height);
+            updateStatus();
+        }
+
+        function updateStatus() {
+            if (isPi) {
+                omegaValueDisplay.innerText = "π (3.14159...)";
+                statusText.innerHTML = "현재 비율은 <span class='text-blue-400 font-bold'>무리수 π</span>입니다. 궤적은 결코 닫히지 않으며, 빈 공간을 무한히 정교하게 채워나갑니다.";
+                statusText.className = "text-slate-200 leading-relaxed";
+            } else {
+                const val = parseFloat(omega).toFixed(4);
+                omegaValueDisplay.innerText = val;
+                statusText.innerHTML = `현재 비율은 <span class='text-emerald-400 font-bold'>유리수 ${val}</span>입니다. 두 주기가 정수비를 이루어 일정 시간이 지나면 이전 궤적을 정확히 반복합니다.`;
+                statusText.className = "text-slate-200 leading-relaxed";
+            }
+        }
+
+        omegaSlider.addEventListener('input', (e) => {
+            omega = parseFloat(e.target.value);
+            isPi = Math.abs(omega - Math.PI) < 0.0001;
+            reset();
+        });
+
+        speedSlider.addEventListener('input', (e) => {
+            drawSpeed = parseInt(e.target.value);
+            speedValueDisplay.innerText = `x${drawSpeed}`;
+        });
+
+        window.setOmega = (val, piMode) => {
+            omega = val;
+            isPi = piMode;
+            omegaSlider.value = val;
+            reset();
+        };
+
+        playPauseBtn.addEventListener('click', () => {
+            isRunning = !isRunning;
+            playIcon.innerText = isRunning ? "⏸" : "▶";
+            playText.innerText = isRunning ? "일시정지" : "재개하기";
+        });
+
+        resetBtn.addEventListener('click', reset);
+
+        function draw() {
+            if (!isRunning) {
+                requestAnimationFrame(draw);
+                return;
+            }
+
+            for (let i = 0; i < drawSpeed; i++) {
+                const x1 = Math.cos(theta);
+                const y1 = Math.sin(theta);
+                const x2 = Math.cos(omega * theta);
+                const y2 = Math.sin(omega * theta);
+
+                const px = centerX + (x1 + x2) * scale;
+                const py = centerY + (y1 + y2) * scale;
+
+                points.push({x: px, y: py});
+                theta += 0.008; // 해상도를 위해 조금 더 촘촘하게
+
+                if (points.length > 60000) points.shift();
+            }
+
+            ctx.clearRect(0, 0, width, height);
+
+            // 가이드 라인 (연한 고리)
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+            ctx.lineWidth = 1;
+            ctx.arc(centerX, centerY, scale, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 궤적 그리기 (Vivid 모드)
+            ctx.beginPath();
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.lineWidth = 1.8; // 더 두꺼운 선
+            
+            // 색상 및 글로우 효과 설정
+            if (isPi) {
+                ctx.strokeStyle = 'rgba(100, 180, 255, 0.9)'; // 더 선명한 파란색
+                ctx.shadowColor = 'rgba(59, 130, 246, 0.4)';
+            } else {
+                ctx.strokeStyle = 'rgba(100, 255, 160, 0.9)'; // 더 선명한 초록색
+                ctx.shadowColor = 'rgba(34, 197, 94, 0.4)';
+            }
+            ctx.shadowBlur = 4; // 은은한 발광 효과
+
+            if (points.length > 0) {
+                ctx.moveTo(points[0].x, points[0].y);
+                const step = points.length > 30000 ? 2 : 1;
+                for (let i = step; i < points.length; i += step) {
+                    ctx.lineTo(points[i].x, points[i].y);
+                }
+            }
+            ctx.stroke();
+
+            // 그림자 효과 초기화 (벡터 선에 영향 주지 않기 위해)
+            ctx.shadowBlur = 0;
+
+            const curTheta = theta;
+            const vx1 = Math.cos(curTheta) * scale;
+            const vy1 = Math.sin(curTheta) * scale;
+            const vx2 = Math.cos(omega * curTheta) * scale;
+            const vy2 = Math.sin(omega * curTheta) * scale;
+
+            // 벡터 1 (굵게 처리)
+            ctx.beginPath();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#3b82f6';
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX + vx1, centerY + vy1);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.fillStyle = '#3b82f6';
+            ctx.arc(centerX + vx1, centerY + vy1, 7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 벡터 2 (굵게 처리)
+            ctx.beginPath();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#22d3ee';
+            ctx.moveTo(centerX + vx1, centerY + vy1);
+            ctx.lineTo(centerX + vx1 + vx2, centerY + vy1 + vy2);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.fillStyle = '#22d3ee';
+            ctx.arc(centerX + vx1 + vx2, centerY + vy1 + vy2, 7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            requestAnimationFrame(draw);
+        }
+
+        window.addEventListener('resize', init);
+        init();
+        draw();
+    </script>
+</body>
+</html>
